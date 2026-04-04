@@ -128,7 +128,7 @@ h1 { font-size: clamp(1.5rem, 5vw, 2.5rem); color: var(--neon-cyan); text-shadow
 function openModal(){
     document.getElementById("qrModal").style.display="flex";
     
-    // Play music when user clicks "Create New QR"
+  
     player.play().then(()=>{
         document.getElementById("playPauseBtn").innerHTML='<i class="fa-solid fa-pause"></i>';
     }).catch(()=>{
