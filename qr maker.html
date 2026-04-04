@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Generator</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+    --neon-cyan: #00f0ff;
+    --neon-pink: #ff00ff;
+    --bg-dark: #0d0d0d;
+}
+* { box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg-dark);
+    color: #fff;
+    margin: 0;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+}
+#webCanvas {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+}
+.input-error { border: 1px solid red !important; }
+.error-text { color: red; font-size: 12px; display: none; }
+#previewBox { display:none; margin-top:10px; padding:10px; background:#111; border:1px solid #333; max-width:320px; font-size:12px; }
+#toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; width: calc(100% - 40px); max-width: 300px; }
+.toast { background: #1a1a1a; color: #fff; padding: 15px; border-left: 5px solid var(--neon-cyan); margin-bottom: 10px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 12px; animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+@keyframes slideIn { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+h1 { font-size: clamp(1.5rem, 5vw, 2.5rem); color: var(--neon-cyan); text-shadow: 0 0 15px var(--neon-cyan); margin: 20px 0; }
+.btn-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; width: 100%; max-width: 600px; }
+.btn { padding: 14px 24px; border-radius: 12px; border: none; cursor: pointer; font-weight: 700; color: #fff; background: linear-gradient(45deg, #ff0066, #00ffff, #ffcc00, #ff00ff); background-size: 300% 300%; animation: gradientBG 5s ease infinite; transition: 0.3s transform; display: inline-flex; align-items: center; gap: 8px; text-transform: uppercase; font-size: 14px; }
+.btn:active { transform: scale(0.95); }
+@keyframes gradientBG { 0% {background-position: 0% 50%;} 50% {background-position: 100% 50%;} 100% {background-position: 0% 50%;} }
+.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; padding: 15px; }
+.modal-content { background: #111; width: 100%; max-width: 450px; padding: clamp(20px, 5vw, 35px); border-radius: 20px; border: 2px solid var(--neon-cyan); box-shadow: 0 0 40px rgba(0, 240, 255, 0.2); max-height: 90vh; overflow-y: auto; position:relative; }
+.close-btn { position:absolute; top:10px; right:15px; cursor:pointer; }
+.modal-content label { display: block; margin-top: 15px; color: var(--neon-cyan); font-size: 12px; font-weight: bold; }
+.modal-content input { width: 100%; padding: 12px; margin-top: 6px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 10px; }
+#qr-container { margin-top: 30px; text-align: center; }
+#qrcode { background: #fff; padding: 15px; border-radius: 15px; display: none; margin: 0 auto; }
+#regNoLabel { color: #888; margin-top: 10px; font-weight: bold; }
+#spinner { display: none; margin: 30px 0; }
+.footer { margin-top: auto; padding: 30px 10px; width: 100%; text-align: center; }
+.wa-link { color: #25D366; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; }
+</style>
+</head>
+<body>
+
+<canvas id="webCanvas"></canvas>
+<div id="toast-container"></div>
+
+<h1><i class="fa-solid fa-bolt"></i> Vinnie QR</h1>
+
+<div class="btn-group">
+    <button class="btn" style="background: #222;" onclick="prevMusic()"><i class="fa-solid fa-backward"></i></button>
+    <button class="btn" id="playPauseBtn" onclick="toggleMusic()"><i class="fa-solid fa-pause"></i></button>
+    <button class="btn" style="background: #222;" onclick="nextMusic()"><i class="fa-solid fa-forward"></i></button>
+</div>
+
+<audio id="musicPlayer" autoplay></audio>
+
+<div class="btn-group" style="margin-top: 20px;">
+    <button class="btn" onclick="openModal()"><i class="fa-solid fa-qrcode"></i> Create New QR</button>
+    <button id="reloadBtn" class="btn" style="display:none; background: #333;" onclick="submitForm(true)">
+        <i class="fa-solid fa-arrows-rotate"></i> Change RegNo
+    </button>
+</div>
+
+<div id="spinner">
+    <i class="fa-solid fa-circle-notch fa-spin fa-3x" style="color: var(--neon-cyan);"></i>
+    <p>Generating QR...</p>
+</div>
+
+<div id="qr-container">
+    <div id="qrcode"></div>
+    <div id="regNoLabel"></div>
+    <div id="previewBox"></div>
+    <br>
+    <button id="downloadBtn" class="btn" style="display:none;" onclick="downloadQR()">
+        <i class="fa-solid fa-cloud-arrow-down"></i> Save PNG
+    </button>
+</div>
+
+<div id="qrModal" class="modal">
+    <div class="modal-content">
+        <i class="fa-solid fa-xmark close-btn" onclick="closeModal()"></i>
+        <h2>Registration Form</h2>
+        <label>Admission Number:</label>
+        <input type="text" id="admissionNo" placeholder="E220/12345/2026">
+        <div id="admError" class="error-text">Required</div>
+
+        <label>Full Name:</label>
+        <input type="text" id="studentName" placeholder="Joe Doe">
+        <div id="nameError" class="error-text">Required</div>
+
+        <label>Programme:</label>
+        <input type="text" id="programme" placeholder="You can leave this blank">
+
+        <label>Stage:</label>
+        <input type="text" id="stage" placeholder="Y4S2">
+        <div id="stageError" class="error-text">Required</div>
+
+        <label>Reg No:</label>
+        <input type="text" id="programme" placeholder="This will be generated." type="text" readonly>
+
+        <button class="btn" onclick="submitForm(false)">Submit</button>
+    </div>
+</div>
+
+<footer class="footer">
+    <a href="https://wa.me/27651089668" class="wa-link" target="_blank">
+        Chat the Developer <i class="fa-brands fa-whatsapp"></i>
+    </a>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+<script>
+// --- MODAL ---
+// --- MODAL ---
+function openModal(){
+    document.getElementById("qrModal").style.display="flex";
+    
+    // Play music when user clicks "Create New QR"
+    player.play().then(()=>{
+        document.getElementById("playPauseBtn").innerHTML='<i class="fa-solid fa-pause"></i>';
+    }).catch(()=>{
+        toast("Click play to start music", "error");
+    });
+}
+function closeModal(){document.getElementById("qrModal").style.display="none";}
+
+// --- TOAST ---
+function toast(msg,type="info"){
+    const container=document.getElementById('toast-container');
+    const t=document.createElement('div');
+    t.className='toast';
+    const icon=type==="error"?"fa-circle-exclamation":"fa-circle-check";
+    t.innerHTML=`<i class="fa-solid ${icon}"></i> ${msg}`;
+    container.appendChild(t);
+    setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),400);},3000);
+}
+
+// --- MUSIC ---
+let player=document.getElementById("musicPlayer");
+
+// ===== NEW PLAYLIST LOGIC =====
+const songs = ["music1.mp3","music2.mp3","music3.mp3","music4.mp3","music5.mp3"];
+let currentSong = 0;
+player.src = songs[currentSong];
+player.loop = false;
+
+function toggleMusic(){
+    const btn=document.getElementById("playPauseBtn");
+    if(player.paused){player.play().catch(()=>toast("Click to allow music")); btn.innerHTML='<i class="fa-solid fa-pause"></i>';}
+    else{player.pause(); btn.innerHTML='<i class="fa-solid fa-play"></i>';}
+}
+
+function prevMusic(){
+    currentSong = (currentSong - 1 + songs.length) % songs.length;
+    player.src = songs[currentSong];
+    player.play().catch(()=>toast("Click to allow music"));
+    toast("Playing previous song");
+}
+
+function nextMusic(){
+    currentSong = (currentSong + 1) % songs.length;
+    player.src = songs[currentSong];
+    player.play().catch(()=>toast("Click to allow music"));
+    toast("Playing next song");
+}
+
+player.addEventListener("ended", ()=>{
+    nextMusic();
+});
+// ===== END PLAYLIST LOGIC =====
+
+// --- QR LOGIC ---
+function submitForm(isReloadOnly){
+    let admInput=document.getElementById("admissionNo");
+    let nameInput=document.getElementById("studentName");
+    let stageInput=document.getElementById("stage");
+
+    let adm=admInput.value.trim();
+    let name=nameInput.value.trim();
+    let prog=document.getElementById("programme").value.trim();
+    let stage=stageInput.value.trim();
+
+    let valid=true;
+    ["admError","nameError","stageError"].forEach(id=>document.getElementById(id).style.display="none");
+    [admInput,nameInput,stageInput].forEach(i=>i.classList.remove("input-error"));
+
+    if(!adm){admInput.classList.add("input-error");admError.style.display="block";valid=false;}
+    if(!name){nameInput.classList.add("input-error");nameError.style.display="block";valid=false;}
+    if(!stage){stageInput.classList.add("input-error");stageError.style.display="block";valid=false;}
+    if(!valid){toast("Fill required fields","error");return;}
+
+    closeModal();
+    // SHOW SPINNER
+    document.getElementById("spinner").style.display="block";
+    document.getElementById("qrcode").style.display="none";
+    document.getElementById("downloadBtn").style.display="none";
+    document.getElementById("previewBox").style.display="none";
+
+    setTimeout(()=>{
+        let regNo="REGNO-3"+Math.floor(1000+Math.random()*9000);
+        let qrText=`Student No: ${adm} | Name: ${name} | Programme: ${prog} | Stage: ${stage} | RegNo: ${regNo}`;
+
+        // SHOW PREVIEW
+        let previewBox=document.getElementById("previewBox");
+        previewBox.style.display="block";
+        previewBox.innerText=qrText;
+
+        // GENERATE QR
+        QRCode.toCanvas(qrText,{width:220},function(err,canvas){
+            let qrDiv=document.getElementById("qrcode");
+            qrDiv.innerHTML="";
+            qrDiv.appendChild(canvas);
+            qrDiv.style.display="block";
+            document.getElementById("regNoLabel").innerText=regNo;
+            document.getElementById("downloadBtn").style.display="inline-block";
+            document.getElementById("reloadBtn").style.display="inline-block";
+            toast(isReloadOnly?"New Reg Number Generated!":"QR Code Ready!");
+        });
+        document.getElementById("spinner").style.display="none";
+    },1500);
+}
+
+function downloadQR(){
+    const canvas=document.querySelector("#qrcode canvas");
+    if(!canvas)return toast("QR not ready yet!","error");
+    const link=document.createElement("a");
+    link.href=canvas.toDataURL("image/png");
+    link.download=`Student_QR_${Date.now()}.png`;
+    link.click();
+    toast("Downloading QR Image...");
+}
+
+// --- SPIDER WEB ---
+let canvas=document.getElementById("webCanvas");
+let ctx=canvas.getContext("2d");
+canvas.width=innerWidth; canvas.height=innerHeight;
+let pts=[]; for(let i=0;i<60;i++){pts.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,vx:Math.random()-0.5,vy:Math.random()-0.5});}
+function draw(){ctx.clearRect(0,0,canvas.width,canvas.height); pts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;ctx.beginPath();ctx.arc(p.x,p.y,2,0,Math.PI*2);ctx.fillStyle="#00f0ff";ctx.fill();}); requestAnimationFrame(draw);}
+draw();
+</script>
+
+</body>
+</html>
