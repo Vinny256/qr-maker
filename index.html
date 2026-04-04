@@ -93,6 +93,7 @@ h1 { font-size: clamp(1.5rem, 5vw, 2.5rem); color: var(--neon-cyan); text-shadow
     <div class="modal-content">
         <i class="fa-solid fa-xmark close-btn" onclick="closeModal()"></i>
         <h2>Registration Form</h2>
+        
         <label>Admission Number:</label>
         <input type="text" id="admissionNo" placeholder="E220/12345/2026">
         <div id="admError" class="error-text">Required</div>
@@ -108,10 +109,13 @@ h1 { font-size: clamp(1.5rem, 5vw, 2.5rem); color: var(--neon-cyan); text-shadow
         <input type="text" id="stage" placeholder="Y4S2">
         <div id="stageError" class="error-text">Required</div>
 
-        <label>Reg No:</label>
-        <input type="text" id="programme" placeholder="This will be generated." type="text" readonly>
+        <label>Semester (Fixed):</label>
+        <input type="text" id="semester" value="JAN-APR26" disabled>
 
-        <button class="btn" onclick="submitForm(false)">Submit</button>
+        <label>Reg No:</label>
+        <input type="text" placeholder="This will be generated." readonly>
+
+        <button class="btn" style="margin-top:20px; width:100%; justify-content:center;" onclick="submitForm(false)">Submit</button>
     </div>
 </div>
 
@@ -124,11 +128,8 @@ h1 { font-size: clamp(1.5rem, 5vw, 2.5rem); color: var(--neon-cyan); text-shadow
 <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 <script>
 // --- MODAL ---
-// --- MODAL ---
 function openModal(){
     document.getElementById("qrModal").style.display="flex";
-    
-  
     player.play().then(()=>{
         document.getElementById("playPauseBtn").innerHTML='<i class="fa-solid fa-pause"></i>';
     }).catch(()=>{
@@ -150,8 +151,6 @@ function toast(msg,type="info"){
 
 // --- MUSIC ---
 let player=document.getElementById("musicPlayer");
-
-// ===== NEW PLAYLIST LOGIC =====
 const songs = ["music1.mp3","music2.mp3","music3.mp3","music4.mp3","music5.mp3"];
 let currentSong = 0;
 player.src = songs[currentSong];
@@ -180,7 +179,6 @@ function nextMusic(){
 player.addEventListener("ended", ()=>{
     nextMusic();
 });
-// ===== END PLAYLIST LOGIC =====
 
 // --- QR LOGIC ---
 function submitForm(isReloadOnly){
@@ -192,18 +190,18 @@ function submitForm(isReloadOnly){
     let name=nameInput.value.trim();
     let prog=document.getElementById("programme").value.trim();
     let stage=stageInput.value.trim();
+    let sem=document.getElementById("semester").value;
 
     let valid=true;
     ["admError","nameError","stageError"].forEach(id=>document.getElementById(id).style.display="none");
     [admInput,nameInput,stageInput].forEach(i=>i.classList.remove("input-error"));
 
-    if(!adm){admInput.classList.add("input-error");admError.style.display="block";valid=false;}
-    if(!name){nameInput.classList.add("input-error");nameError.style.display="block";valid=false;}
-    if(!stage){stageInput.classList.add("input-error");stageError.style.display="block";valid=false;}
+    if(!adm){admInput.classList.add("input-error");document.getElementById("admError").style.display="block";valid=false;}
+    if(!name){nameInput.classList.add("input-error");document.getElementById("nameError").style.display="block";valid=false;}
+    if(!stage){stageInput.classList.add("input-error");document.getElementById("stageError").style.display="block";valid=false;}
     if(!valid){toast("Fill required fields","error");return;}
 
     closeModal();
-    // SHOW SPINNER
     document.getElementById("spinner").style.display="block";
     document.getElementById("qrcode").style.display="none";
     document.getElementById("downloadBtn").style.display="none";
@@ -211,14 +209,12 @@ function submitForm(isReloadOnly){
 
     setTimeout(()=>{
         let regNo="REGNO-3"+Math.floor(1000+Math.random()*9000);
-        let qrText=`Student No: ${adm} | Name: ${name} | Programme: ${prog} | Stage: ${stage} | RegNo: ${regNo}`;
+        let qrText=`Student No: ${adm} | Name: ${name} | Programme: ${prog} | Stage: ${stage} | Semester: ${sem} | RegNo: ${regNo}`;
 
-        // SHOW PREVIEW
         let previewBox=document.getElementById("previewBox");
         previewBox.style.display="block";
         previewBox.innerText=qrText;
 
-        // GENERATE QR
         QRCode.toCanvas(qrText,{width:220},function(err,canvas){
             let qrDiv=document.getElementById("qrcode");
             qrDiv.innerHTML="";
